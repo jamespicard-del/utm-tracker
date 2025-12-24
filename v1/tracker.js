@@ -1,6 +1,6 @@
 /**
  * JPS UTM Attribution Tracker
- * Version: 1.0.0
+ * Version: 1.0.1
  *
  * Automatically captures UTM parameters and populates hidden form fields
  * for accurate marketing attribution tracking.
@@ -12,13 +12,14 @@
  * - Auto-populate hidden fields
  * - GDPR-ready
  * - Error handling
+ * - GoHighLevel data-q attribute support
  */
 
 (function() {
   'use strict';
 
   const CONFIG = {
-    version: '1.0.0',
+    version: '1.0.1',
     cookieMaxAge: 2592000, // 30 days in seconds
     cookiePath: '/',
     storagePrefix: 'jps_utm_',
@@ -203,6 +204,18 @@
         if (!field.value || field.value === '') {
           field.value = decodeURIComponent(utmData[utmParam]);
           log.info(`Populated data-utm field: ${utmParam} = ${field.value}`);
+        }
+      }
+    });
+
+    // GoHighLevel compatibility: check for data-q attributes
+    const ghlFields = document.querySelectorAll('[data-q]');
+    ghlFields.forEach(function(field) {
+      const fieldKey = field.getAttribute('data-q');
+      if (fieldKey && utmData[fieldKey]) {
+        if (!field.value || field.value === '') {
+          field.value = decodeURIComponent(utmData[fieldKey]);
+          log.info(`Populated GHL field (data-q): ${fieldKey} = ${field.value}`);
         }
       }
     });
