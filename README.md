@@ -45,6 +45,16 @@ Download `v1/tracker.js` and upload to your server:
 
 ---
 
+## Documentation Complète
+
+**Guides d'installation et configuration:**
+
+- **[Installation GHL (15 min)](docs/INSTALLATION.md)** - Comment installer le script sur GoHighLevel et créer les champs cachés
+- **[Configuration Facebook Ads (5 min)](docs/FACEBOOK-SETUP.md)** - Template UTM avec paramètres dynamiques Facebook
+- **[Configuration Google Ads (5 min)](docs/GOOGLE-ADS-SETUP.md)** - Template UTM avec paramètres dynamiques Google + auto-tagging
+
+---
+
 ## CDN Setup (jsDelivr + GitHub)
 
 ### Step 1: Create GitHub Repo
