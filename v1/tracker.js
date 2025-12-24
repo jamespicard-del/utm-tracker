@@ -18,12 +18,19 @@
 (function() {
   'use strict';
 
+  // Guard: Prevent double-initialization
+  if (window.JPSUTMTracker && window.JPSUTMTracker.version) {
+    console.log('[UTM Tracker] Already initialized v' + window.JPSUTMTracker.version + ', skipping duplicate');
+    return;
+  }
+
   const CONFIG = {
-    version: '1.0.1',
+    version: '1.1.0',
     cookieMaxAge: 2592000, // 30 days in seconds
     cookiePath: '/',
     storagePrefix: 'jps_utm_',
     utmParams: ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'],
+    clickIds: ['fbclid', 'gclid'], // Facebook & Google click IDs for conversion tracking
     debug: false, // Set to true for console logging
     gdprCompliant: true // Check for cookie consent before storing
   };
@@ -113,29 +120,39 @@
   }
 
   /**
-   * Capture UTM parameters from current URL
+   * Capture UTM parameters and click IDs from current URL
    */
   function captureUTMParams() {
     const urlParams = new URLSearchParams(window.location.search);
     const captured = {};
-    let hasUTM = false;
+    let hasParams = false;
 
+    // Capture UTM parameters
     CONFIG.utmParams.forEach(function(param) {
       const value = urlParams.get(param);
       if (value) {
         captured[param] = value;
-        hasUTM = true;
-
-        // Store in both cookie and localStorage (redundancy)
+        hasParams = true;
         setCookie(param, value);
         setLocalStorage(param, value);
       }
     });
 
-    if (hasUTM) {
-      log.info('UTM parameters captured', captured);
+    // Capture click IDs (fbclid, gclid)
+    CONFIG.clickIds.forEach(function(param) {
+      const value = urlParams.get(param);
+      if (value) {
+        captured[param] = value;
+        hasParams = true;
+        setCookie(param, value);
+        setLocalStorage(param, value);
+      }
+    });
+
+    if (hasParams) {
+      log.info('Parameters captured', captured);
     } else {
-      log.info('No UTM parameters found in URL');
+      log.info('No tracking parameters found in URL');
     }
 
     return captured;
@@ -153,12 +170,21 @@
   }
 
   /**
-   * Get all stored UTM parameters
+   * Get all stored parameters (UTMs + click IDs)
    */
   function getAllStoredUTMs() {
     const stored = {};
 
+    // Get UTM params
     CONFIG.utmParams.forEach(function(param) {
+      const value = getStoredUTM(param);
+      if (value) {
+        stored[param] = value;
+      }
+    });
+
+    // Get click IDs
+    CONFIG.clickIds.forEach(function(param) {
       const value = getStoredUTM(param);
       if (value) {
         stored[param] = value;
