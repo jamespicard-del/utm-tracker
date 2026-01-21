@@ -102,7 +102,7 @@ Nothing yet.
 
 **After:**
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
 **Steps:**
@@ -115,5 +115,5 @@ Nothing yet.
 
 ---
 
-[Unreleased]: https://github.com/YOUR-USERNAME/utm-tracker/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/YOUR-USERNAME/utm-tracker/releases/tag/v1.0.0
+[Unreleased]: https://github.com/jamespicard-del/utm-tracker/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/jamespicard-del/utm-tracker/releases/tag/v1.0.0

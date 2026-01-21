@@ -29,10 +29,10 @@ Navigate to: **Settings → Tracking Code**
 
 ```html
 <!-- JPS UTM Attribution Tracker v1 -->
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
-**Replace `YOUR-USERNAME` with your actual GitHub username.**
+**Replace `jamespicard-del` with your actual GitHub username.**
 
 **Important:**
 - ✅ Place in `<head>` section (Header Tracking Code)
@@ -391,7 +391,7 @@ For 10+ clients, consider GHL API automation:
 # deploy-tracking-code.sh
 
 CLIENTS=("client1_location_id" "client2_location_id")
-SCRIPT_TAG='<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>'
+SCRIPT_TAG='<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>'
 
 for client in "${CLIENTS[@]}"; do
   curl -X PUT "https://services.leadconnectorhq.com/locations/$client/settings" \

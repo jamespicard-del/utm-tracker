@@ -27,8 +27,8 @@ gh repo create utm-tracker --public --description "UTM attribution tracking for 
 ### Clone Your New Repo
 
 ```bash
-# Replace YOUR-USERNAME with your GitHub username
-git clone https://github.com/YOUR-USERNAME/utm-tracker.git
+# Replace jamespicard-del with your GitHub username
+git clone https://github.com/jamespicard-del/utm-tracker.git
 cd utm-tracker
 ```
 
@@ -81,10 +81,10 @@ jsDelivr needs time to index your repo.
 
 ### Test CDN URL
 
-Visit this URL in your browser (replace YOUR-USERNAME):
+Visit this URL in your browser (replace jamespicard-del):
 
 ```
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js
 ```
 
 **Expected:** You see the JavaScript code for tracker.js
@@ -95,13 +95,13 @@ https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js
 
 ```
 # Latest tag
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@latest/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@latest/v1/tracker.js
 
 # Specific version
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@1.0.0/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@1.0.0/v1/tracker.js
 
 # Latest commit on main
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@main/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@main/v1/tracker.js
 ```
 
 **For production, use:** `@v1` (auto-updates within v1.x.x)
@@ -113,7 +113,7 @@ https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@main/v1/tracker.js
 ### Get Your Production CDN URL
 
 ```
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js
 ```
 
 Copy this URL - you'll use it for all clients.
@@ -183,7 +183,7 @@ git push origin main --tags
 
 **Client uses:**
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
 **Behavior:**
@@ -197,7 +197,7 @@ git push origin main --tags
 
 **Client uses:**
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@1.0.0/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@1.0.0/v1/tracker.js"></script>
 ```
 
 **Behavior:**
@@ -210,7 +210,7 @@ git push origin main --tags
 
 **Client uses:**
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@latest/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@latest/v1/tracker.js"></script>
 ```
 
 **Behavior:**
@@ -273,7 +273,7 @@ develop (testing, pre-release)
 1. Wait 10 more minutes
 2. Force purge: Add `?purge=true` to CDN URL
    ```
-   https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js?purge=true
+   https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js?purge=true
    ```
 3. Visit URL in incognito mode (bypass browser cache)
 
@@ -362,7 +362,7 @@ develop (testing, pre-release)
 
 Your CDN is live at:
 ```
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js
 ```
 
 **Now:**

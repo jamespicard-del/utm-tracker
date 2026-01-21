@@ -478,7 +478,7 @@ If you want first-touch attribution, modify tracker.js to NOT overwrite existing
 **Steps:**
 1. Visit CDN URL directly in browser:
    ```
-   https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js
+   https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js
    ```
 2. Check response
 

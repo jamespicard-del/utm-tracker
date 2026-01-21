@@ -53,7 +53,7 @@
 
 **CDN:** jsdelivr (production-stable)
 ```
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js
 ```
 
 **Client Onboarding:**

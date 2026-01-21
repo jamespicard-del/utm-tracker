@@ -5,6 +5,19 @@
 
 ---
 
+## 📋 CODE PRÊT À COLLER (TOUS LES CLIENTS)
+
+**Copie ce code et colle-le dans GoHighLevel → Settings → Tracking Code → Header:**
+
+```html
+<!-- JPS UTM Attribution Tracker v1 -->
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
+```
+
+✅ **Le MÊME code fonctionne pour TOUS tes clients** (pas besoin de le personnaliser par client)
+
+---
+
 ## Ce que fait ce script
 
 Le script capture automatiquement les paramètres UTM (source, medium, campaign, etc.) depuis les URLs de vos publicités Facebook/Google et remplit les champs cachés dans vos formulaires.
@@ -33,10 +46,10 @@ Le script capture automatiquement les paramètres UTM (source, medium, campaign,
 **Code à copier-coller dans "Header Tracking Code":**
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
-**IMPORTANT:** Remplacer `YOUR-USERNAME` par votre nom d'utilisateur GitHub.
+**IMPORTANT:** Remplacer `jamespicard-del` par votre nom d'utilisateur GitHub.
 
 **Pourquoi cette option:**
 - ✅ Le script s'applique à TOUTES les pages du funnel automatiquement
@@ -50,7 +63,7 @@ Le script capture automatiquement les paramètres UTM (source, medium, campaign,
 **Code à copier-coller dans "Head Code":**
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
 **ATTENTION:** Si vous utilisez cette option, vous devez ajouter le script à CHAQUE page du funnel pour que le tracking multi-page fonctionne.
@@ -205,7 +218,7 @@ Le script capture automatiquement les paramètres UTM (source, medium, campaign,
 2. **Vérifier type de champ:** Doit être "Hidden" ou "Text" (pas Dropdown/Radio)
 3. **Activer debug mode:**
    ```html
-   <script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+   <script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
    <script>
      JPSUTMTracker.debug(true);
    </script>
@@ -223,7 +236,7 @@ Le script capture automatiquement les paramètres UTM (source, medium, campaign,
 
 **Solutions:**
 1. **Vérifier connexion internet**
-2. **Tester URL CDN directement:** Copier `https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js` dans navigateur
+2. **Tester URL CDN directement:** Copier `https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js` dans navigateur
 3. **Vérifier GitHub repo public:** Le repo doit être public pour que jsDelivr puisse le servir
 
 ---

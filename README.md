@@ -6,6 +6,19 @@ Automatically captures UTM parameters from URLs and populates hidden form fields
 
 ---
 
+## 📋 CODE PRÊT À COLLER (TOUS LES CLIENTS)
+
+**Copie ce code et colle-le dans GoHighLevel → Settings → Tracking Code → Header:**
+
+```html
+<!-- JPS UTM Attribution Tracker v1 -->
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
+```
+
+✅ **Le MÊME code fonctionne pour TOUS tes clients** (pas besoin de le personnaliser par client)
+
+---
+
 ## Features
 
 ✅ **Cookie Persistence** - 30-day tracking across multiple pages
@@ -26,7 +39,7 @@ Automatically captures UTM parameters from URLs and populates hidden form fields
 **Add to GHL Tracking Code:**
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
 **Benefits:**
@@ -62,7 +75,7 @@ Download `v1/tracker.js` and upload to your server:
 ```bash
 # Create new repo on GitHub: utm-tracker
 # Clone locally
-git clone https://github.com/YOUR-USERNAME/utm-tracker.git
+git clone https://github.com/jamespicard-del/utm-tracker.git
 cd utm-tracker
 
 # Copy files from this directory
@@ -80,7 +93,7 @@ git push origin main --tags
 Your tracker is now available at:
 
 ```
-https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js
+https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js
 ```
 
 **Versioning Options:**
@@ -104,7 +117,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full client setup guide.
 **Settings → Tracking Code (or Custom Code section):**
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
 ### 2. Create Hidden Fields in Forms

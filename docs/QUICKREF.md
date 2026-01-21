@@ -1,12 +1,15 @@
 # UTM Tracker Quick Reference
 
-## 1. Installation Code
+## 📋 CODE PRÊT À COLLER
+
+**Copie-colle ce code dans GoHighLevel → Settings → Tracking Code → Header:**
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/YOUR-USERNAME/utm-tracker@v1/v1/tracker.js"></script>
+<!-- JPS UTM Attribution Tracker v1 -->
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
 ```
 
-**Replace `YOUR-USERNAME` with your GitHub username**
+✅ **Le MÊME code fonctionne pour TOUS tes clients**
 
 ---
 
