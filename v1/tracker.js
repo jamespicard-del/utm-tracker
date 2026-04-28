@@ -1,6 +1,6 @@
 /**
  * JPS UTM Attribution Tracker
- * Version: 1.0.1
+ * Version: 1.2.0
  *
  * Automatically captures UTM parameters and populates hidden form fields
  * for accurate marketing attribution tracking.
@@ -9,10 +9,11 @@
  * - Cookie persistence (30 days)
  * - localStorage fallback
  * - Multi-page tracking
- * - Auto-populate hidden fields
+ * - Auto-populate hidden fields (standard name, data-utm, GHL data-q)
  * - GDPR-ready
  * - Error handling
  * - GoHighLevel data-q attribute support
+ * - NEW v1.2: Iframe URL passthrough for embedded GHL forms (multi-tenant)
  */
 
 (function() {
@@ -25,15 +26,44 @@
   }
 
   const CONFIG = {
-    version: '1.1.0',
+    version: '1.2.0',
     cookieMaxAge: 2592000, // 30 days in seconds
     cookiePath: '/',
     storagePrefix: 'jps_utm_',
     utmParams: ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'],
     clickIds: ['fbclid', 'gclid'], // Facebook & Google click IDs for conversion tracking
     debug: false, // Set to true for console logging
-    gdprCompliant: true // Check for cookie consent before storing
+    gdprCompliant: true, // Check for cookie consent before storing
+    // NEW v1.2: GHL iframe hosts for URL passthrough (universal multi-tenant)
+    ghlHosts: [
+      'leadconnectorhq.com',     // Forms (catches api.leadconnectorhq.com via substring)
+      'msgsndr.com',             // Funnels / sites
+      'gohighlevel.com',         // Legacy + admin
+      'forms.gohighlevel.com'    // Legacy form host
+    ]
   };
+
+  // NEW v1.2: Pull custom whitelabel host from <script data-iframe-host="..."> if present
+  (function pullCustomHost() {
+    try {
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const src = scripts[i].src || '';
+        if (src.indexOf('utm-tracker') === -1 && src.indexOf('tracker.js') === -1) continue;
+        const custom = scripts[i].getAttribute('data-iframe-host');
+        if (custom && CONFIG.ghlHosts.indexOf(custom) === -1) {
+          CONFIG.ghlHosts.push(custom);
+        }
+        break;
+      }
+    } catch (e) { /* swallow */ }
+  })();
+
+  // NEW v1.2: Detect parent vs iframe context
+  const IS_IN_IFRAME = (function() {
+    try { return window.self !== window.top; }
+    catch (e) { return true; } // cross-origin top access throws → must be in iframe
+  })();
 
   /**
    * Logger utility
@@ -247,35 +277,109 @@
     });
   }
 
+  // ============================================================
+  // NEW v1.2: IFRAME URL PASSTHROUGH (multi-tenant universal)
+  // ============================================================
+
+  /**
+   * Check if a given URL points to a known GHL iframe host.
+   */
+  function isGhlIframe(src) {
+    if (!src) return false;
+    for (let i = 0; i < CONFIG.ghlHosts.length; i++) {
+      if (src.indexOf(CONFIG.ghlHosts[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Append UTMs + click IDs to a single iframe's `src` (idempotent).
+   * Solves cross-origin: when GHL form is embedded as an iframe on a
+   * client website, the iframe cannot read parent URL UTMs. This patches
+   * the iframe URL with query params BEFORE the iframe loads, so the
+   * GHL page receives the data and can capture it via this same script
+   * running on the GHL side.
+   */
+  function patchIframeUrl(iframe) {
+    const utmData = getAllStoredUTMs();
+    if (Object.keys(utmData).length === 0) return false;
+
+    const src = iframe.src || iframe.getAttribute('data-src') || '';
+    if (!src || !isGhlIframe(src)) return false;
+    if (src.indexOf('jps_patched=1') !== -1) return false; // already done
+
+    try {
+      const url = new URL(src);
+      let added = 0;
+      Object.keys(utmData).forEach(function(key) {
+        if (!url.searchParams.has(key)) {
+          url.searchParams.set(key, decodeURIComponent(utmData[key]));
+          added++;
+        }
+      });
+      url.searchParams.set('jps_patched', '1');
+      iframe.src = url.toString();
+      log.info('Patched iframe with ' + added + ' params', iframe.src);
+      return true;
+    } catch (e) {
+      log.error('Iframe patch failed', e);
+      return false;
+    }
+  }
+
+  /**
+   * Patch all GHL iframes on the page (parent-context only).
+   */
+  function patchAllIframes() {
+    if (IS_IN_IFRAME) return; // Only patch from parent context
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(function(iframe) { patchIframeUrl(iframe); });
+  }
+
   /**
    * Initialize tracker
    */
   function init() {
-    log.info(`UTM Tracker v${CONFIG.version} initializing...`);
+    log.info('UTM Tracker v' + CONFIG.version + ' initializing...', {
+      context: IS_IN_IFRAME ? 'iframe' : 'parent',
+      ghlHosts: CONFIG.ghlHosts
+    });
 
     // Step 1: Capture UTM params from URL (if present)
     captureUTMParams();
 
-    // Step 2: Wait for DOM to be ready, then populate forms
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', populateFormFields);
-    } else {
-      // DOM already loaded
+    // Step 2: Wait for DOM to be ready, then populate forms + patch iframes
+    function onReady() {
       populateFormFields();
+      if (!IS_IN_IFRAME) patchAllIframes();
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', onReady);
+    } else {
+      onReady();
     }
 
     // Step 3: Re-populate on dynamic form loads (SPA support)
-    // Watch for new forms being added to the DOM
+    // Watch for new forms / iframes being added to the DOM
     if (typeof MutationObserver !== 'undefined') {
       const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
           if (mutation.addedNodes.length) {
-            // Check if any added nodes contain forms
             mutation.addedNodes.forEach(function(node) {
-              if (node.nodeType === 1) { // Element node
-                if (node.tagName === 'FORM' || node.querySelector('form')) {
-                  log.info('New form detected, populating fields');
-                  setTimeout(populateFormFields, 100); // Small delay for form initialization
+              if (node.nodeType !== 1) return; // Element nodes only
+
+              // New <form> detected → re-populate fields
+              if (node.tagName === 'FORM' || node.querySelector('form')) {
+                log.info('New form detected, populating fields');
+                setTimeout(populateFormFields, 100);
+              }
+
+              // NEW v1.2: New <iframe> detected → patch it (parent context only)
+              if (!IS_IN_IFRAME) {
+                if (node.tagName === 'IFRAME') {
+                  patchIframeUrl(node);
+                } else if (node.querySelector && node.querySelector('iframe')) {
+                  setTimeout(patchAllIframes, 50);
                 }
               }
             });
@@ -300,6 +404,10 @@
     version: CONFIG.version,
     getUTMData: getAllStoredUTMs,
     refresh: populateFormFields,
+    // NEW v1.2:
+    patchIframes: patchAllIframes,
+    isInIframe: function() { return IS_IN_IFRAME; },
+    ghlHosts: function() { return CONFIG.ghlHosts.slice(); },
     debug: function(enable) {
       CONFIG.debug = enable;
     }

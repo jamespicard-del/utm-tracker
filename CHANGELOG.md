@@ -11,6 +11,46 @@ Nothing yet.
 
 ---
 
+## [1.2.0] - 2026-04-28
+
+### Added
+- **Iframe URL passthrough (multi-tenant universal):** Auto-detects GHL form iframes
+  on the parent site and injects UTMs + click IDs as query params into the iframe `src`
+  BEFORE the iframe loads. Solves the cross-origin DOM access bug that prevented v1.x
+  from filling forms embedded as iframes on third-party client websites.
+- **Multi-host GHL detection:** Built-in detection of `leadconnectorhq.com`,
+  `msgsndr.com`, `gohighlevel.com`, `forms.gohighlevel.com`. Substring match catches
+  all subdomains (e.g. `api.leadconnectorhq.com`).
+- **Custom whitelabel domain override:** Add `data-iframe-host="forms.client.com"`
+  attribute on the `<script>` tag for clients using whitelabeled GHL form domains.
+- **Auto-detect parent vs iframe context:** Same script, different behavior per
+  context. In iframe context, only fills DOM forms. In parent context, also patches
+  GHL iframe URLs.
+- **MutationObserver for dynamic iframes:** New iframes added to the page after
+  initial load are auto-patched.
+- **Public API additions:**
+  - `JPSUTMTracker.patchIframes()` — manual trigger
+  - `JPSUTMTracker.isInIframe()` — context detection
+  - `JPSUTMTracker.ghlHosts()` — list detected hosts
+
+### Why this matters
+This is the fix for clients who embed their GHL form as an `<iframe>` on their
+own website (very common with WordPress, Webflow, custom HTML sites). Without
+this passthrough, the iframe could not see UTMs from the parent URL, causing
+20%+ of leads to arrive in GHL with no attribution. Tested on PMT Paysagement.
+
+### Compatibility
+- Backward compatible with v1.x — same cookie format, same `JPSUTMTracker` API
+- No client-side changes required: bumping the `@v1` tag forwards everyone to
+  this version automatically (jsDelivr CDN cache invalidates within ~12h)
+
+### Technical Details
+- File size: 8.6 KB → ~11 KB (still tiny)
+- Zero new dependencies
+- All new code wrapped in feature flags (graceful degradation)
+
+---
+
 ## [1.0.1] - 2025-12-24
 
 ### Fixed
