@@ -1,0 +1,155 @@
+name: Publish tracker to jpmetrix-cdn
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-cdn
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout utm-tracker (full history for tag discovery)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Identify pushed tag
+        id: tag
+        run: |
+          # GITHUB_REF on tag push is "refs/tags/vX.Y.Z"
+          PUSHED_TAG="${GITHUB_REF#refs/tags/}"
+          echo "Pushed tag: $PUSHED_TAG"
+          echo "pushed_tag=$PUSHED_TAG" >> "$GITHUB_OUTPUT"
+
+          # Verify tracker.js exists at v1/tracker.js for this checkout
+          if [ ! -f v1/tracker.js ]; then
+            echo "FAIL: v1/tracker.js missing in utm-tracker @$PUSHED_TAG"
+            exit 1
+          fi
+
+      - name: Discover all stable semver tags
+        id: tags
+        run: |
+          # Strict semver regex — no pre-release suffix
+          STABLE_TAGS=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)
+          echo "Stable tags found:"
+          echo "$STABLE_TAGS"
+
+          # Pre-release tags (published at exact path only, never floating)
+          PRERELEASE_TAGS=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-' || true)
+          echo "Pre-release tags found:"
+          echo "$PRERELEASE_TAGS"
+
+          # Save to files for next step (multi-line outputs are awkward in $GITHUB_OUTPUT)
+          echo "$STABLE_TAGS" > /tmp/stable_tags.txt
+          echo "$PRERELEASE_TAGS" > /tmp/prerelease_tags.txt
+
+          if [ -z "$STABLE_TAGS" ]; then
+            echo "FAIL: no stable semver tags found — at least one vX.Y.Z required"
+            exit 1
+          fi
+
+      - name: Checkout jpmetrix-cdn (target repo)
+        uses: actions/checkout@v4
+        with:
+          repository: jamespicard-del/jpmetrix-cdn
+          token: ${{ secrets.CDN_PUBLISH_TOKEN }}
+          path: cdn
+          fetch-depth: 1
+
+      - name: Build CDN tree (exact + floats + latest)
+        run: |
+          set -euo pipefail
+          cd cdn
+
+          # Step 1: clean previous floating dirs (keep .git, vercel.json, test.html, README, .gitignore)
+          # Remove any directory that looks like vMAJOR or vMAJOR.MINOR or vMAJOR.MINOR.PATCH or latest
+          find . -maxdepth 1 -type d -regextype posix-extended -regex '\./(v[0-9]+(\.[0-9]+(\.[0-9]+(-[0-9A-Za-z.-]+)?)?)?|latest)' -exec rm -rf {} +
+
+          # Step 2: publish every stable tag at its exact path (vX.Y.Z/tracker.js)
+          # We need the tracker.js content AT that tag — git show works without checking out
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            echo "Publishing exact: $tag"
+            mkdir -p "$tag"
+            git -C .. show "${tag}:v1/tracker.js" > "${tag}/tracker.js"
+          done < /tmp/stable_tags.txt
+
+          # Step 3: publish every pre-release tag at its exact path (vX.Y.Z-suffix/tracker.js)
+          # Pre-releases are testable by URL but never win floating resolution (D-08)
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            echo "Publishing pre-release exact: $tag"
+            mkdir -p "$tag"
+            git -C .. show "${tag}:v1/tracker.js" > "${tag}/tracker.js"
+          done < /tmp/prerelease_tags.txt
+
+          # Step 4: compute minor floats (vMAJOR.MINOR/) — pick highest patch among stable tags only
+          # Group stable tags by major.minor and pick the topmost (already sorted DESC by -v:refname)
+          declare -A SEEN_MINOR
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            # tag = vX.Y.Z; minor = vX.Y
+            minor="${tag%.*}"
+            if [ -z "${SEEN_MINOR[$minor]:-}" ]; then
+              SEEN_MINOR[$minor]=1
+              echo "Float minor $minor → $tag"
+              mkdir -p "$minor"
+              cp "${tag}/tracker.js" "${minor}/tracker.js"
+            fi
+          done < /tmp/stable_tags.txt
+
+          # Step 5: compute major floats (vMAJOR/) — pick highest minor.patch among stable tags only
+          declare -A SEEN_MAJOR
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            # tag = vX.Y.Z; major = vX
+            major="${tag%%.*}"
+            if [ -z "${SEEN_MAJOR[$major]:-}" ]; then
+              SEEN_MAJOR[$major]=1
+              echo "Float major $major → $tag"
+              mkdir -p "$major"
+              cp "${tag}/tracker.js" "${major}/tracker.js"
+            fi
+          done < /tmp/stable_tags.txt
+
+          # Step 6: latest = topmost stable tag (already sorted DESC)
+          LATEST_TAG=$(head -n 1 /tmp/stable_tags.txt)
+          echo "Latest → $LATEST_TAG"
+          mkdir -p latest
+          cp "${LATEST_TAG}/tracker.js" "latest/tracker.js"
+
+          # Sanity: list what we produced
+          echo "=== Published tree ==="
+          find . -maxdepth 2 -name 'tracker.js' | sort
+
+      - name: Commit and push to jpmetrix-cdn
+        env:
+          PUSHED_TAG: ${{ steps.tag.outputs.pushed_tag }}
+        run: |
+          set -euo pipefail
+          cd cdn
+
+          git config user.name "jpmetrix-cdn-bot"
+          git config user.email "actions@github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes — already up to date."
+            exit 0
+          fi
+
+          git commit -m "chore(cdn): publish tracker ${PUSHED_TAG}" -m "Auto-generated by utm-tracker GitHub Action on tag push. Source: jamespicard-del/utm-tracker@${PUSHED_TAG}"
+          git push origin main
+
+          echo "Pushed to jpmetrix-cdn main."
