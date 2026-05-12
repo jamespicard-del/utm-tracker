@@ -1,19 +1,9 @@
-/**
- * JPS UTM Attribution Tracker — Version 1.3.0
- * Captures UTM/click-ids → cookies+localStorage → form auto-fill + iframe passthrough + behavioral beacons.
- *
- * v1.2 features: cookie persistence 30d, localStorage fallback, multi-page tracking, hidden-field auto-fill
- * (standard name + data-utm + GHL data-q), GDPR consent gate, iframe URL passthrough for embedded GHL forms.
- *
- * NEW v1.3: persistent UID cookie (UUID v4 30d) + localStorage fallback; three behavioral beacons (pageview,
- * form_view, form_start) via navigator.sendBeacon; data-account script-tag attribute → account_slug; iframe →
- * parent postMessage routing for beacons (parent validates origin vs CONFIG.ghlHosts).
- */
+/* JPS UTM Attribution Tracker v1.3.0 — UTM/click-id capture (cookie+localStorage) → form auto-fill + iframe passthrough + behavioral beacons (pageview/form_view/form_start) via navigator.sendBeacon. UID cookie (UUID v4, 30d). data-account script attr → account_slug. Iframe → parent postMessage routing (origin validated vs CONFIG.ghlHosts). GDPR consent gated. */
 
 (function() {
   'use strict';
 
-  // Guard: Prevent double-initialization
+  // Guard: double-init
   if (window.JPSUTMTracker && window.JPSUTMTracker.version) {
     console.log('[UTM Tracker] Already initialized v' + window.JPSUTMTracker.version + ', skipping duplicate');
     return;
@@ -28,14 +18,14 @@
     clickIds: ['fbclid', 'gclid'], // Facebook & Google click IDs for conversion tracking
     debug: false, // Set to true for console logging
     gdprCompliant: true, // Check for cookie consent before storing
-    // NEW v1.2: GHL iframe hosts for URL passthrough (universal multi-tenant)
+    // v1.2: GHL iframe hosts
     ghlHosts: [
       'leadconnectorhq.com',     // Forms (catches api.leadconnectorhq.com via substring)
       'msgsndr.com',             // Funnels / sites
       'gohighlevel.com',         // Legacy + admin
       'forms.gohighlevel.com'    // Legacy form host
     ],
-    // NEW v1.3: UID + beacon configuration
+    // v1.3: UID + beacon
     uidCookieName: 'jps_uid',
     uidStorageKey: 'uid',                 // suffix; full key = storagePrefix + uidStorageKey = 'jps_utm_uid' (D-23)
     beaconEndpoint: 'https://track.jpmetrix.com/api/beacon',
@@ -48,7 +38,7 @@
     iframeMessageType: 'jps-beacon'       // postMessage envelope type — D-14
   };
 
-  // NEW v1.2: Pull custom whitelabel host from <script data-iframe-host="..."> if present
+  // v1.2: pull data-iframe-host
   (function pullCustomHost() {
     try {
       const scripts = document.querySelectorAll('script');
@@ -64,14 +54,14 @@
     } catch (e) { /* swallow */ }
   })();
 
-  // NEW v1.3: Module-scoped state. FORM_OBSERVED = wired forms; FORM_VIEW_FIRED / FORM_START_FIRED = form_ids that already emitted.
+  // v1.3: module state
   let ACCOUNT_SLUG = null;
   let UID = null;
   const FORM_OBSERVED = new WeakSet();
   const FORM_VIEW_FIRED = new Set();
   const FORM_START_FIRED = new Set();
 
-  // NEW v1.3: Read data-account from own <script> tag (D-01, TRACK-07)
+  // v1.3: data-account (D-01,TRACK-07)
   (function readDataAccount() {
     try {
       let scriptEl = document.currentScript;
@@ -89,26 +79,26 @@
     } catch (e) { /* swallow */ }
   })();
 
-  // NEW v1.2: Detect parent vs iframe context
+  // v1.2: iframe detect
   const IS_IN_IFRAME = (function() {
     try { return window.self !== window.top; } catch (e) { return true; }
   })();
 
-  // Logger utility
+  // Logger
   const log = {
-    info: function(msg, data) { if (CONFIG.debug) console.log('[UTM Tracker]', msg, data || ''); },
-    error: function(msg, error) { if (CONFIG.debug) console.error('[UTM Tracker ERROR]', msg, error); },
-    beacon: function(eventType, payloadOrError) { if (CONFIG.debug) console.log('[UTM Tracker BEACON]', eventType, payloadOrError || ''); }
+    info: function(m, d) { if (CONFIG.debug) console.log('[UTM]', m, d || ''); },
+    error: function(m, e) { if (CONFIG.debug) console.error('[UTM ERR]', m, e); },
+    beacon: function(t, p) { if (CONFIG.debug) console.log('[UTM BCN]', t, p || ''); }
   };
 
-  // Check if cookies are accepted (GDPR compliance). Override to integrate with your CMP.
+  // GDPR consent gate
   function cookiesAccepted() {
     if (!CONFIG.gdprCompliant) return true;
     const consentCookie = getCookie('cookie_consent') || getCookie('cookieConsent') || getCookie('cookies_accepted');
     return consentCookie !== 'false';
   }
 
-  // Get cookie value by name
+  // getCookie
   function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
@@ -116,90 +106,89 @@
     return null;
   }
 
-  // Set cookie with name and value
+  // setCookie
   function setCookie(name, value) {
     if (!cookiesAccepted()) {
-      log.info('Cookies not accepted, skipping cookie storage');
+      log.info('no consent');
       return false;
     }
     try {
       document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${CONFIG.cookieMaxAge}; path=${CONFIG.cookiePath}; SameSite=Lax`;
-      log.info(`Cookie set: ${name}=${value}`);
+      log.info('cookie set', name);
       return true;
     } catch (e) {
-      log.error('Failed to set cookie', e);
+      log.error('setCookie', e);
       return false;
     }
   }
 
-  // Get value from localStorage
+  // getLS
   function getLocalStorage(key) {
     try {
       return localStorage.getItem(CONFIG.storagePrefix + key);
     } catch (e) {
-      log.error('Failed to read localStorage', e);
+      log.error('getLS', e);
       return null;
     }
   }
 
-  // Set value in localStorage
+  // setLS
   function setLocalStorage(key, value) {
     try {
       localStorage.setItem(CONFIG.storagePrefix + key, value);
-      log.info(`localStorage set: ${key}=${value}`);
+      log.info('ls set', key);
       return true;
     } catch (e) {
-      log.error('Failed to set localStorage', e);
+      log.error('setLS', e);
       return false;
     }
   }
 
-  // NEW v1.3: Generate UUID v4 — crypto.randomUUID() preferred, crypto.getRandomValues fallback (D-21).
+  // v1.3: UUID v4 (D-21)
   function generateUID() {
     try {
       if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-      // Fallback manual UUID v4 (RFC 4122) — uses crypto.getRandomValues for entropy
       if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
         const b = new Uint8Array(16);
         crypto.getRandomValues(b);
-        b[6] = (b[6] & 0x0f) | 0x40; // version 4
-        b[8] = (b[8] & 0x3f) | 0x80; // variant 10xx
+        b[6] = (b[6] & 0x0f) | 0x40;
+        b[8] = (b[8] & 0x3f) | 0x80;
         const h = [];
         for (let i = 0; i < 16; i++) h.push(b[i].toString(16).padStart(2, '0'));
         return h[0]+h[1]+h[2]+h[3]+'-'+h[4]+h[5]+'-'+h[6]+h[7]+'-'+h[8]+h[9]+'-'+h[10]+h[11]+h[12]+h[13]+h[14]+h[15];
       }
-    } catch (e) { log.error('UID generation failed', e); }
+    } catch (e) { log.error('UID gen', e); }
     return 'fid_fallback_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
   }
 
-  // NEW v1.3: setCookie variant with Secure attribute when on https (D-22).
+  // v1.3: setCookieSecure (D-22)
   function setCookieSecure(name, value) {
-    if (!cookiesAccepted()) { log.info('Cookies not accepted, skipping cookie storage'); return false; }
+    if (!cookiesAccepted()) { log.info('no consent'); return false; }
     try {
       const secure = (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:') ? '; Secure' : '';
       document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + CONFIG.cookieMaxAge + '; path=' + CONFIG.cookiePath + '; SameSite=Lax' + secure;
-      log.info('Cookie set (secure): ' + name + '=' + value);
+      log.info('cookie sec', name);
       return true;
-    } catch (e) { log.error('Failed to set secure cookie', e); return false; }
+    } catch (e) { log.error('setCookieSec', e); return false; }
   }
 
-  // NEW v1.3: Read UID from cookie → localStorage → generate fresh. Gated by cookiesAccepted() (D-18, D-22, D-23, D-24).
+  // v1.3: getOrCreateUID (D-18,22,23,24)
   function getOrCreateUID() {
-    if (!cookiesAccepted()) { log.info('UID: consent denied, skipping'); return null; }
+    if (!cookiesAccepted()) { log.info('UID denied'); return null; }
     try {
       let uid = getCookie(CONFIG.uidCookieName);
-      if (uid) { log.info('UID: loaded from cookie', uid); return uid; }
+      if (uid) { log.info('UID cookie', uid); return uid; }
       uid = getLocalStorage(CONFIG.uidStorageKey);
-      if (uid) { log.info('UID: loaded from localStorage, re-setting cookie', uid); setCookieSecure(CONFIG.uidCookieName, uid); return uid; }
+      if (uid) { log.info('UID LS', uid); setCookieSecure(CONFIG.uidCookieName, uid); return uid; }
       uid = generateUID();
-      log.info('UID: generated fresh', uid);
+      log.info('UID new', uid);
       setCookieSecure(CONFIG.uidCookieName, uid);
       setLocalStorage(CONFIG.uidStorageKey, uid);
       return uid;
-    } catch (e) { log.error('getOrCreateUID failed', e); return null; }
+    } catch (e) { log.error('getOrCreateUID', e); return null; }
   }
 
-  // NEW v1.3: Build the standard beacon payload envelope (D-10).
+  // v1.3: buildBeaconPayload (D-10)
   function buildBeaconPayload(eventType, extras) {
     const stored = getAllStoredUTMs();
     const utm = {};
@@ -225,47 +214,47 @@
     return payload;
   }
 
-  // NEW v1.3: Dispatch a beacon. Iframe → postMessage to parent. Parent → sendBeacon + fetch keepalive fallback. Gated by cookiesAccepted() (D-18, D-08).
+  // v1.3: sendBeaconEvent (D-18,D-08)
   function sendBeaconEvent(eventType, extras) {
     try {
-      if (!cookiesAccepted()) { log.beacon(eventType, 'skipped: consent denied'); return false; }
-      if (!UID) { log.beacon(eventType, 'skipped: no UID'); return false; }
+      if (!cookiesAccepted()) { log.beacon(eventType, 'denied'); return false; }
+      if (!UID) { log.beacon(eventType, 'no UID'); return false; }
       const payload = buildBeaconPayload(eventType, extras || {});
-      // Iframe context → relay to parent (D-14, D-15, D-16)
+      // iframe → parent
       if (IS_IN_IFRAME) {
         try {
           window.parent.postMessage({ type: CONFIG.iframeMessageType, payload: payload }, '*');
-          log.beacon(eventType, 'relayed via postMessage to parent');
+          log.beacon(eventType, 'relayed');
           return true;
-        } catch (e) { log.error('postMessage to parent failed', e); return false; }
+        } catch (e) { log.error('postMsg', e); return false; }
       }
-      // Parent context → direct dispatch
+      // parent
       return dispatchBeacon(payload);
-    } catch (e) { log.error('sendBeaconEvent failed', e); return false; }
+    } catch (e) { log.error('sendBeacon', e); return false; }
   }
 
-  // NEW v1.3: Low-level beacon dispatch (parent only). sendBeacon → fetch keepalive fallback.
+  // v1.3: dispatchBeacon
   function dispatchBeacon(payload) {
     try {
       const body = JSON.stringify(payload);
       const blob = new Blob([body], { type: 'application/json' });
       if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
         const ok = navigator.sendBeacon(CONFIG.beaconEndpoint, blob);
-        if (ok) { log.beacon(payload.event, 'sent via sendBeacon'); return true; }
-        log.beacon(payload.event, 'sendBeacon returned false, attempting fetch fallback');
+        if (ok) { log.beacon(payload.event, 'sent'); return true; }
+        log.beacon(payload.event, 'fb fetch');
       }
       if (typeof fetch === 'function') {
         fetch(CONFIG.beaconEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true, mode: 'no-cors' })
-          .then(function() { log.beacon(payload.event, 'sent via fetch keepalive'); })
-          .catch(function(err) { log.error('fetch beacon failed', err); });
+          .then(function() { log.beacon(payload.event, 'fetch sent'); })
+          .catch(function(err) { log.error('fetch', err); });
         return true;
       }
-      log.error('No beacon transport available', null);
+      log.error('no transport', null);
       return false;
-    } catch (e) { log.error('dispatchBeacon threw', e); return false; }
+    } catch (e) { log.error('dispatch', e); return false; }
   }
 
-  // NEW v1.3: Parent-window listener for iframe-relayed beacons. Validates origin vs CONFIG.ghlHosts, enriches url+referrer (D-15, D-16).
+  // v1.3: parent listener (D-15,D-16)
   function installParentMessageListener() {
     if (IS_IN_IFRAME) return;
     try {
@@ -280,19 +269,19 @@
           for (let i = 0; i < CONFIG.ghlHosts.length; i++) {
             if (origin.indexOf(CONFIG.ghlHosts[i]) !== -1) { trusted = true; break; }
           }
-          if (!trusted) { log.beacon('iframe-relay', 'dropped: untrusted origin ' + origin); return; }
-          // Enrich with parent's own URL + referrer (D-16)
+          if (!trusted) { log.beacon('relay', 'untrusted ' + origin); return; }
+          // enrich url+ref (D-16)
           const enriched = data.payload;
           enriched.url = (typeof window !== 'undefined' && window.location) ? window.location.href : enriched.url;
           enriched.referrer = (typeof document !== 'undefined') ? (document.referrer || enriched.referrer) : enriched.referrer;
           dispatchBeacon(enriched);
-        } catch (innerErr) { log.error('parent message handler inner error', innerErr); }
+        } catch (innerErr) { log.error('msg handler', innerErr); }
       }, false);
-      log.info('Parent message listener installed for iframe beacon relay');
-    } catch (e) { log.error('installParentMessageListener failed', e); }
+      log.info('parent listener up');
+    } catch (e) { log.error('parent listener', e); }
   }
 
-  // Capture UTM parameters and click IDs from current URL
+  // captureUTMParams
   function captureUTMParams() {
     const urlParams = new URLSearchParams(window.location.search);
     const captured = {};
@@ -306,18 +295,18 @@
         setLocalStorage(param, value);
       }
     });
-    log.info(hasParams ? 'Parameters captured' : 'No tracking parameters found in URL', captured);
+    log.info(hasParams ? 'params' : 'no params', captured);
     return captured;
   }
 
-  // Get stored UTM value (cookie first, then localStorage)
+  // getStoredUTM
   function getStoredUTM(param) {
     let value = getCookie(param);
     if (!value) value = getLocalStorage(param);
     return value;
   }
 
-  // Get all stored parameters (UTMs + click IDs)
+  // getAllStoredUTMs
   function getAllStoredUTMs() {
     const stored = {};
     CONFIG.utmParams.forEach(function(param) {
@@ -331,39 +320,39 @@
     return stored;
   }
 
-  // Populate hidden form fields with UTM data
+  // populateFormFields
   function populateFormFields() {
     const utmData = getAllStoredUTMs();
-    if (Object.keys(utmData).length === 0) { log.info('No UTM data to populate'); return; }
-    log.info('Populating form fields with UTM data', utmData);
-    // Standard hidden/text input matching by name
+    if (Object.keys(utmData).length === 0) { log.info('no UTM'); return; }
+    log.info('populate', utmData);
+    // by name
     document.querySelectorAll('input[type="hidden"], input[type="text"]').forEach(function(input) {
       const fieldName = input.name || input.getAttribute('name') || input.id;
       if (fieldName && utmData[fieldName] && (!input.value || input.value === '')) {
         input.value = decodeURIComponent(utmData[fieldName]);
-        log.info(`Populated field: ${fieldName} = ${input.value}`);
+        log.info('fld', fieldName);
       }
     });
-    // data-utm attribute pattern
+    // data-utm
     document.querySelectorAll('[data-utm]').forEach(function(field) {
       const utmParam = field.getAttribute('data-utm');
       if (utmParam && utmData[utmParam] && (!field.value || field.value === '')) {
         field.value = decodeURIComponent(utmData[utmParam]);
-        log.info(`Populated data-utm field: ${utmParam} = ${field.value}`);
+        log.info('dutm', utmParam);
       }
     });
-    // GoHighLevel data-q attribute pattern
+    // data-q
     document.querySelectorAll('[data-q]').forEach(function(field) {
       const fieldKey = field.getAttribute('data-q');
       if (fieldKey && utmData[fieldKey] && (!field.value || field.value === '')) {
         field.value = decodeURIComponent(utmData[fieldKey]);
-        log.info(`Populated GHL field (data-q): ${fieldKey} = ${field.value}`);
+        log.info('dq', fieldKey);
       }
     });
   }
 
-  // NEW v1.2: IFRAME URL PASSTHROUGH (multi-tenant universal)
-  // Check if a given URL points to a known GHL iframe host.
+  // v1.2: IFRAME URL PASSTHROUGH
+  // isGhlIframe
   function isGhlIframe(src) {
     if (!src) return false;
     for (let i = 0; i < CONFIG.ghlHosts.length; i++) {
@@ -372,7 +361,7 @@
     return false;
   }
 
-  // Append UTMs + click IDs to a single iframe's src (idempotent). Solves cross-origin: GHL form embedded on client website cannot read parent URL UTMs.
+  // patchIframeUrl
   function patchIframeUrl(iframe) {
     const utmData = getAllStoredUTMs();
     if (Object.keys(utmData).length === 0) return false;
@@ -387,99 +376,145 @@
       });
       url.searchParams.set('jps_patched', '1');
       iframe.src = url.toString();
-      log.info('Patched iframe with ' + added + ' params', iframe.src);
+      log.info('iframe patched', added);
       return true;
-    } catch (e) { log.error('Iframe patch failed', e); return false; }
+    } catch (e) { log.error('iframePatch', e); return false; }
   }
 
-  // Patch all GHL iframes on the page (parent-context only).
+  // patchAllIframes
   function patchAllIframes() {
     if (IS_IN_IFRAME) return;
     const iframes = document.querySelectorAll('iframe');
     iframes.forEach(function(iframe) { patchIframeUrl(iframe); });
   }
 
-  // Initialize tracker
+  // v1.3: computeFormId (D-12,D-13)
+  const formIdCache = new WeakMap();
+  async function computeFormId(formEl) {
+    try {
+      if (!formEl || formEl.tagName !== 'FORM') return null;
+      const explicitId = formEl.getAttribute('id');
+      if (explicitId && explicitId.length > 0) return explicitId;
+      const cached = formIdCache.get(formEl);
+      if (cached) return cached;
+      const inputs = Array.from(formEl.querySelectorAll('input[name], textarea[name], select[name]'))
+        .map(function(i) { return i.getAttribute('name'); }).filter(function(n) { return !!n; });
+      if (inputs.length === 0) return null;
+      inputs.sort();
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(inputs.join(',')));
+      const hex = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+      const formId = 'fid_' + hex.slice(0, 8);
+      formIdCache.set(formEl, formId);
+      return formId;
+    } catch (e) { log.error('formId', e); return null; }
+  }
+
+  // v1.3: attachFormObservers (D-09)
+  function attachFormObservers(formEl) {
+    try {
+      if (!formEl || formEl.tagName !== 'FORM') return;
+      if (FORM_OBSERVED.has(formEl)) return;
+      FORM_OBSERVED.add(formEl);
+      if (typeof IntersectionObserver !== 'undefined') {
+        try {
+          const io = new IntersectionObserver(function(entries) {
+            entries.forEach(async function(entry) {
+              if (!entry.isIntersecting || entry.intersectionRatio < CONFIG.formViewThreshold) return;
+              const formId = await computeFormId(formEl);
+              if (!formId) { io.unobserve(formEl); return; }
+              if (!FORM_VIEW_FIRED.has(formId)) {
+                FORM_VIEW_FIRED.add(formId);
+                sendBeaconEvent(CONFIG.beaconEvents.formView, { form_id: formId });
+                io.unobserve(formEl);
+              }
+            });
+          }, { threshold: CONFIG.formViewThreshold });
+          io.observe(formEl);
+        } catch (e) { log.error('IO attach', e); }
+      } else { log.info('no IO'); }
+      const onFocusIn = async function() {
+        try {
+          const formId = await computeFormId(formEl);
+          if (!formId) return;
+          if (!FORM_START_FIRED.has(formId)) {
+            FORM_START_FIRED.add(formId);
+            sendBeaconEvent(CONFIG.beaconEvents.formStart, { form_id: formId });
+            formEl.removeEventListener('focusin', onFocusIn);
+          }
+        } catch (e) { log.error('focusin', e); }
+      };
+      formEl.addEventListener('focusin', onFocusIn);
+      log.info('obs attached');
+    } catch (e) { log.error('attach', e); }
+  }
+
+  // v1.3: attachAllFormObservers
+  function attachAllFormObservers() {
+    try { document.querySelectorAll('form').forEach(function(f) { attachFormObservers(f); }); }
+    catch (e) { log.error('attachAll', e); }
+  }
+
+  // init
   function init() {
-    log.info('UTM Tracker v' + CONFIG.version + ' initializing...', {
-      context: IS_IN_IFRAME ? 'iframe' : 'parent',
-      ghlHosts: CONFIG.ghlHosts
-    });
-
-    // Step 1: Capture UTM params from URL (if present)
-    captureUTMParams();
-
-    // Step 2: Wait for DOM to be ready, then populate forms + patch iframes
-    function onReady() {
+    log.info('init', { ctx: IS_IN_IFRAME ? 'i' : 'p', acc: ACCOUNT_SLUG });
+    captureUTMParams();                          // Step 1: v1.2 — UTM/click-id capture
+    UID = getOrCreateUID();                      // Step 2: v1.3 — UID cookie/localStorage/generate
+    installParentMessageListener();              // Step 3: v1.3 — parent listener for iframe-relayed beacons
+    sendBeaconEvent(CONFIG.beaconEvents.pageview, {}); // Step 4: v1.3 — fire pageview beacon
+    function onReady() {                         // Step 5: DOM ready → populate + patch + attach observers
       populateFormFields();
       if (!IS_IN_IFRAME) patchAllIframes();
+      attachAllFormObservers();
     }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', onReady);
-    } else {
-      onReady();
-    }
-
-    // Step 3: Re-populate on dynamic form loads (SPA support)
-    // Watch for new forms / iframes being added to the DOM
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
+    else onReady();
+    // MutationObserver SPA
     if (typeof MutationObserver !== 'undefined') {
       const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
-          if (mutation.addedNodes.length) {
-            mutation.addedNodes.forEach(function(node) {
-              if (node.nodeType !== 1) return; // Element nodes only
-
-              // New <form> detected → re-populate fields
-              if (node.tagName === 'FORM' || node.querySelector('form')) {
-                log.info('New form detected, populating fields');
-                setTimeout(populateFormFields, 100);
-              }
-
-              // NEW v1.2: New <iframe> detected → patch it (parent context only)
-              if (!IS_IN_IFRAME) {
-                if (node.tagName === 'IFRAME') {
-                  patchIframeUrl(node);
-                } else if (node.querySelector && node.querySelector('iframe')) {
-                  setTimeout(patchAllIframes, 50);
-                }
-              }
-            });
-          }
+          if (!mutation.addedNodes.length) return;
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType !== 1) return;
+            if (node.tagName === 'FORM') {
+              log.info('form root');
+              setTimeout(populateFormFields, 100);
+              attachFormObservers(node);
+            } else if (node.querySelector && node.querySelector('form')) {
+              log.info('form nested');
+              setTimeout(populateFormFields, 100);
+              node.querySelectorAll('form').forEach(function(f) { attachFormObservers(f); });
+            }
+            if (!IS_IN_IFRAME) {
+              if (node.tagName === 'IFRAME') patchIframeUrl(node);
+              else if (node.querySelector && node.querySelector('iframe')) setTimeout(patchAllIframes, 50);
+            }
+          });
         });
       });
-
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
+      observer.observe(document.body, { childList: true, subtree: true });
     }
-
-    log.info('UTM Tracker initialized successfully');
+    log.info('init ok', { uid: UID, account_slug: ACCOUNT_SLUG });
   }
 
-  // Auto-initialize when script loads
+  // auto-init
   init();
 
-  // Expose public API (optional, for advanced usage)
+  // public API
   window.JPSUTMTracker = {
     version: CONFIG.version,
     getUTMData: getAllStoredUTMs,
     refresh: populateFormFields,
-    // NEW v1.2:
     patchIframes: patchAllIframes,
     isInIframe: function() { return IS_IN_IFRAME; },
     ghlHosts: function() { return CONFIG.ghlHosts.slice(); },
-    debug: function(enable) {
-      CONFIG.debug = enable;
-    },
-    // NEW v1.3 additions (no forward refs)
+    debug: function(enable) { CONFIG.debug = enable; },
+    // v1.3
     get uid() { return UID; },
     get account() { return ACCOUNT_SLUG; }
-    // NOTE: flushBeacon is attached below AFTER window.JPSUTMTracker is assigned.
+    // flushBeacon attached below
   };
 
-  // NEW v1.3: Expose flushBeacon debug helper (after sendBeaconEvent is defined AND
-  // window.JPSUTMTracker namespace is assigned — no forward ref, no race).
+  // v1.3: attach flushBeacon (after namespace + sendBeaconEvent in scope)
   if (window.JPSUTMTracker) {
     window.JPSUTMTracker.flushBeacon = function(eventType, extras) {
       return sendBeaconEvent(eventType, extras || {});
