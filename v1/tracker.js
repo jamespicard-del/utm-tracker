@@ -1,6 +1,6 @@
 /**
  * JPS UTM Attribution Tracker
- * Version: 1.2.0
+ * Version: 1.3.0
  *
  * Automatically captures UTM parameters and populates hidden form fields
  * for accurate marketing attribution tracking.
@@ -14,6 +14,10 @@
  * - Error handling
  * - GoHighLevel data-q attribute support
  * - NEW v1.2: Iframe URL passthrough for embedded GHL forms (multi-tenant)
+ * - NEW v1.3: Persistent UID cookie (UUID v4, 30 days) with localStorage fallback
+ * - NEW v1.3: Three behavioral beacons (pageview, form_view, form_start) via navigator.sendBeacon
+ * - NEW v1.3: data-account attribute support (script tag attribute for account_slug)
+ * - NEW v1.3: Iframe → parent postMessage routing for beacons
  */
 
 (function() {
@@ -26,7 +30,7 @@
   }
 
   const CONFIG = {
-    version: '1.2.0',
+    version: '1.3.0',
     cookieMaxAge: 2592000, // 30 days in seconds
     cookiePath: '/',
     storagePrefix: 'jps_utm_',
@@ -40,7 +44,18 @@
       'msgsndr.com',             // Funnels / sites
       'gohighlevel.com',         // Legacy + admin
       'forms.gohighlevel.com'    // Legacy form host
-    ]
+    ],
+    // NEW v1.3: UID + beacon configuration
+    uidCookieName: 'jps_uid',
+    uidStorageKey: 'uid',                 // suffix; full key = storagePrefix + uidStorageKey = 'jps_utm_uid' (D-23)
+    beaconEndpoint: 'https://track.jpmetrix.com/api/beacon',
+    beaconEvents: {
+      pageview: 'pageview',
+      formView: 'form_view',
+      formStart: 'form_start'
+    },
+    formViewThreshold: 0.5,               // IntersectionObserver — D-09
+    iframeMessageType: 'jps-beacon'       // postMessage envelope type — D-14
   };
 
   // NEW v1.2: Pull custom whitelabel host from <script data-iframe-host="..."> if present
@@ -55,6 +70,33 @@
           CONFIG.ghlHosts.push(custom);
         }
         break;
+      }
+    } catch (e) { /* swallow */ }
+  })();
+
+  // NEW v1.3: Module-scoped state
+  let ACCOUNT_SLUG = null;
+  let UID = null;
+  const FORM_OBSERVED = new WeakSet();      // forms already wired with view+focus listeners
+  const FORM_VIEW_FIRED = new Set();        // form_ids that already emitted form_view
+  const FORM_START_FIRED = new Set();       // form_ids that already emitted form_start
+
+  // NEW v1.3: Read data-account from own <script> tag (D-01, TRACK-07)
+  (function readDataAccount() {
+    try {
+      // Try document.currentScript first (works during synchronous load)
+      let scriptEl = document.currentScript;
+      if (scriptEl) {
+        const acc = scriptEl.getAttribute('data-account');
+        if (acc) { ACCOUNT_SLUG = acc; return; }
+      }
+      // Fallback: iterate script tags (same pattern as pullCustomHost)
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const src = scripts[i].src || '';
+        if (src.indexOf('utm-tracker') === -1 && src.indexOf('tracker.js') === -1) continue;
+        const acc = scripts[i].getAttribute('data-account');
+        if (acc) { ACCOUNT_SLUG = acc; return; }
       }
     } catch (e) { /* swallow */ }
   })();
@@ -74,6 +116,9 @@
     },
     error: function(msg, error) {
       if (CONFIG.debug) console.error('[UTM Tracker ERROR]', msg, error);
+    },
+    beacon: function(eventType, payloadOrError) {
+      if (CONFIG.debug) console.log('[UTM Tracker BEACON]', eventType, payloadOrError || '');
     }
   };
 
@@ -146,6 +191,90 @@
     } catch (e) {
       log.error('Failed to set localStorage', e);
       return false;
+    }
+  }
+
+  /**
+   * NEW v1.3: Generate a UUID v4. Prefers crypto.randomUUID(); falls back to
+   * a manual UUID v4 using crypto.getRandomValues. (D-21)
+   */
+  function generateUID() {
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      // Fallback manual UUID v4 (RFC 4122) — uses crypto.getRandomValues for entropy
+      if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;   // version 4
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;   // variant 10xx
+        const hex = [];
+        for (let i = 0; i < 16; i++) {
+          hex.push(bytes[i].toString(16).padStart(2, '0'));
+        }
+        return hex[0]+hex[1]+hex[2]+hex[3] + '-' +
+               hex[4]+hex[5] + '-' +
+               hex[6]+hex[7] + '-' +
+               hex[8]+hex[9] + '-' +
+               hex[10]+hex[11]+hex[12]+hex[13]+hex[14]+hex[15];
+      }
+    } catch (e) { log.error('UID generation failed', e); }
+    // Last-ditch fallback (entropy-weak; should be unreachable in modern browsers)
+    return 'fid_fallback_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  /**
+   * NEW v1.3: setCookie variant with Secure attribute when on https (D-22).
+   * The existing setCookie() does NOT add Secure; we need Secure for the UID.
+   */
+  function setCookieSecure(name, value) {
+    if (!cookiesAccepted()) {
+      log.info('Cookies not accepted, skipping cookie storage');
+      return false;
+    }
+    try {
+      const secure = (typeof window !== 'undefined' &&
+                      window.location && window.location.protocol === 'https:') ? '; Secure' : '';
+      document.cookie = name + '=' + encodeURIComponent(value) +
+        '; max-age=' + CONFIG.cookieMaxAge +
+        '; path=' + CONFIG.cookiePath +
+        '; SameSite=Lax' + secure;
+      log.info('Cookie set (secure): ' + name + '=' + value);
+      return true;
+    } catch (e) {
+      log.error('Failed to set secure cookie', e);
+      return false;
+    }
+  }
+
+  /**
+   * NEW v1.3: Read UID from cookie → localStorage → generate fresh.
+   * Gated by cookiesAccepted() (D-18). Returns null if consent denied.
+   * (D-22, D-23, D-24)
+   */
+  function getOrCreateUID() {
+    if (!cookiesAccepted()) {
+      log.info('UID: consent denied, skipping');
+      return null;
+    }
+    try {
+      let uid = getCookie(CONFIG.uidCookieName);
+      if (uid) { log.info('UID: loaded from cookie', uid); return uid; }
+      uid = getLocalStorage(CONFIG.uidStorageKey);
+      if (uid) {
+        log.info('UID: loaded from localStorage, re-setting cookie', uid);
+        setCookieSecure(CONFIG.uidCookieName, uid);
+        return uid;
+      }
+      uid = generateUID();
+      log.info('UID: generated fresh', uid);
+      setCookieSecure(CONFIG.uidCookieName, uid);
+      setLocalStorage(CONFIG.uidStorageKey, uid);
+      return uid;
+    } catch (e) {
+      log.error('getOrCreateUID failed', e);
+      return null;
     }
   }
 
@@ -410,7 +539,11 @@
     ghlHosts: function() { return CONFIG.ghlHosts.slice(); },
     debug: function(enable) {
       CONFIG.debug = enable;
-    }
+    },
+    // NEW v1.3 additions (no forward refs)
+    get uid() { return UID; },
+    get account() { return ACCOUNT_SLUG; }
+    // NOTE: flushBeacon is attached in Task 2 AFTER sendBeaconEvent is defined.
   };
 
 })();
