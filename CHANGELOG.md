@@ -11,6 +11,60 @@ Nothing yet.
 
 ---
 
+## [1.3.0] - 2026-05-12
+
+### Added
+- **Persistent UID cookie (`jps_uid`):** UUID v4 generated client-side via `crypto.randomUUID()`
+  (with `crypto.getRandomValues` fallback for older browsers). Cookie attributes: 30-day max-age,
+  Path=/, SameSite=Lax, Secure on https. localStorage fallback at key `jps_utm_uid` (D-23).
+  Read order on init: cookie → localStorage → generate fresh + persist to both. Gated by
+  existing `cookiesAccepted()` GDPR check.
+- **Three behavioral beacons via `navigator.sendBeacon`:**
+  - `pageview` — fires once per page load on tracker init
+  - `form_view` — fires when a `<form>` (with named inputs) scrolls into the viewport
+    (IntersectionObserver, threshold 0.5), once per form_id per page load
+  - `form_start` — fires on first focus inside any input within a `<form>`, once per
+    form_id per page load
+- **Beacon endpoint:** Hardcoded to `https://track.jpmetrix.com/api/beacon`. Phase 93 will
+  wire the Vercel rewrite + Supabase Edge Function. Beacons silently 404 until then
+  (sendBeacon is fire-and-forget; no console errors).
+- **Beacon payload schema:** Standard envelope with `event`, `uid`, `account_slug`, `url`,
+  `referrer`, `utm{}`, `click_ids{}`, `form_id`, `ts_client`, `v`. **No PII in payloads.**
+- **`data-account` script tag attribute:** Each client can declare their account slug via
+  `<script src="https://track.jpmetrix.com/v1/tracker.js" data-account="lesdecadrees"></script>`.
+  Read on init; included as `account_slug` in beacon payloads. Optional — legacy installs
+  without this attribute will be resolved server-side via hostname fallback (Phase 93).
+- **Iframe → parent postMessage routing:** When tracker initializes in an iframe context
+  (`IS_IN_IFRAME===true`), beacons are relayed to the parent window via
+  `postMessage({ type: 'jps-beacon', payload: {...} })`. Parent window installs a listener
+  that validates origin against `CONFIG.ghlHosts` before dispatching the beacon.
+  Parent enriches the payload with its own URL + referrer (since the iframe's URL is
+  typically the embed source).
+- **Public API additions:**
+  - `JPSUTMTracker.uid` — read-only getter; returns current UID or null if consent denied
+  - `JPSUTMTracker.account` — read-only getter; returns `data-account` value or null
+  - `JPSUTMTracker.flushBeacon(eventType, extras)` — debug helper to send a synthetic beacon
+- **Stable form_id resolution (D-12):** For each form, `form_id` = `<form id="...">` attribute
+  if set, else `'fid_' + SHA-256(sorted comma-joined input names).slice(0, 8)` via
+  `crypto.subtle.digest('SHA-256', ...)` (async, cached on a WeakMap keyed by the form
+  element to avoid recomputation). Same form shape produces same form_id across reloads
+  (required for funnel correlation in Phase 94).
+
+### Notes
+- **Backward compat with v1.2:** All v1.2 features unchanged — UTM cookie capture,
+  form auto-fill (`name` / `data-utm` / `data-q` patterns), iframe URL passthrough,
+  multi-host GHL detection, custom whitelabel domain override via `data-iframe-host`,
+  MutationObserver for SPA / dynamic content. Existing 5 production installs receive v1.3
+  via the `/v1/` float and continue working unchanged.
+- **CDN paths:** `/v1.3.0/tracker.js`, `/v1.3/tracker.js`, `/v1/tracker.js`, `/latest/tracker.js`
+  all serve v1.3.0 after tag push (auto-published by jpmetrix-cdn GitHub Action).
+- **File size:** ~12.6 KB (v1.2.0) → ~20.2 KB (v1.3.0). Still under 20 KB unminified budget cap (20,195 bytes / 20,480-byte cap = 285-byte headroom).
+- **Dependencies:** Zero new dependencies — pure vanilla JS, IIFE wrapper, strict mode.
+- **Defensive defaults:** All new code paths defensive — try/catch on every async surface,
+  silent failures, debug logs gated by `CONFIG.debug=false` (default).
+
+---
+
 ## [1.2.0] - 2026-04-28
 
 ### Added
