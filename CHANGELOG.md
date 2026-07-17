@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+Nothing in **this repo**.
+
+---
+
+## 🔴 TROU DE CHANGELOG — v1.4 → v1.6.4 (constaté 2026-07-16)
+
+**Six versions ont shippé en prod sans jamais passer par ce repo ni par ce fichier.** Elles vivent
+dans **`jamespicard-del/jpmetrix-cdn`** (commits directs, aucun tag, aucune entrée ici). Ce changelog
+est donc **incomplet à partir de v1.4** : il ne décrit pas la version que les clients chargent.
+
+Reconstruit depuis les messages de commit de `jpmetrix-cdn` (`git log`, 2026-07-16) :
+
+| Version | Ce qu'elle apporte |
+|---|---|
+| **v1.4** | rename `jps_uid` → **`jpm_uid`** + injection de l'UID dans les forms/iframes |
+| **v1.5.0** | injection `?jpm_uid=<UID>` via `history.replaceState` — contourne le fait que GHL nomme les hidden inputs par **hexId**, pas par field name |
+| **v1.6.0** | `setReactiveValue()` framework-aware (setter de prototype + dispatch `input`/`change`) — requis pour que le `v-model` des forms Vue de GHL Funnel se synchronise |
+| **v1.6.1** | `form_view`/`form_start` sur les forms modernes GHL rendus en `<div id="_builder-form">` ; `computeFormId` basé sur `data-q` (fieldKey) |
+| **v1.6.2** | capture `_fbc`/`_fbp` (Pixel FB) → hidden fields `fbc`/`fbp` pour la dédup CAPI server-side |
+| **v1.6.3** | injection URL étendue à `fbc`/`fbp`/`fbclid` (même mécanisme que v1.5) |
+| **v1.6.4** | retry de l'injection sur `DOMContentLoaded` + MutationObserver — corrige une race condition (le Pixel FB pose ses cookies 50-200 ms après l'init) |
+
+**Cause :** le pipeline `tag vX.Y.Z → Action publish-cdn.yml → jpmetrix-cdn` a été **abandonné** après
+`v1.3.0` (12 mai 2026). L'Action n'est pas cassée (2 runs verts) ; personne ne l'a plus utilisée.
+
+⚠️ Tant que la source n'est pas retranchée (voir `CONTEXT.md §FILE D'ACTIONS`), ce fichier documente
+**l'historique de ce repo**, pas celui de la prod. Ne pas le compléter comme si de rien n'était.
 
 ---
 
