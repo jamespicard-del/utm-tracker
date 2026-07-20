@@ -242,6 +242,8 @@ git push --tags
 
 **Propagation rollback:** 24-48h (même délai qu'update)
 
+> ℹ️ **Depuis v1.3.0 :** la publication multi-path (`/v1.3.0/`, `/v1/`, `/latest/`) est automatisée par l'action GitHub `jpmetrix-cdn` au tag push (plus besoin d'attendre jsDelivr manuellement) — le rollback ci-dessus reste valide, juste plus rapide.
+
 ---
 
 ### 7. Monitoring & Alerting
@@ -448,5 +450,5 @@ https://utm-tracker.jpsystem.ca/tracker.js
 
 ---
 
-**Last updated:** 2025-12-24
-**Version:** 1.0.0
+**Last updated:** 2026-07-13 (note ajoutée : publication CDN automatisée via action `jpmetrix-cdn` depuis v1.3.0 — reste guidance générale et non-versionnée par ailleurs)
+**Script version at last review:** 1.3.0

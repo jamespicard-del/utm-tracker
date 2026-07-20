@@ -1,5 +1,11 @@
 # JPS UTM Attribution Tracker
 
+> ## ⚰️ REPO ARCHIVÉ (2026-07-20) — NE PAS CODER ICI
+>
+> **Source canonique du tracker = [`jamespicard-del/jpmetrix-cdn`](https://github.com/jamespicard-del/jpmetrix-cdn)** (tranché par James 2026-07-17, invariant « un fork = déclaré, jamais fantôme »).
+> Ce repo est figé à **v1.3.0** ; la prod (`track.jpmetrix.com/v1/tracker.js`) est à **v1.7.0** (email stitch, #352) — 7 versions d'écart. Le pipeline tag→Action→CDN a été abandonné après v1.3.0 et l'Action `publish-cdn.yml` est **supprimée** (un vieux tag aurait republié une base morte).
+> Historique utile conservé : CHANGELOG ≤ v1.3, harnais Playwright d'origine.
+
 **Production-ready UTM parameter tracking for GoHighLevel clients**
 
 Automatically captures UTM parameters from URLs and populates hidden form fields for accurate marketing attribution.
@@ -12,10 +18,12 @@ Automatically captures UTM parameters from URLs and populates hidden form fields
 
 ```html
 <!-- JPS UTM Attribution Tracker v1 -->
-<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js" data-account="<slug-client>"></script>
 ```
 
-✅ **Le MÊME code fonctionne pour TOUS tes clients** (pas besoin de le personnaliser par client)
+✅ **Le MÊME code fonctionne pour TOUS tes clients** (pas besoin de le personnaliser par client, sauf `data-account` — un slug unique par client)
+
+> 🖼️ **Form GHL embeddé en iframe sur un site externe ?** C'est supporté — le script fait un passthrough automatique de l'attribution dans le `src` de l'iframe. Installe le script sur la **page hôte** (le site externe), pas dans l'iframe elle-même. Détail → [CHANGELOG.md §1.2.0](CHANGELOG.md).
 
 ---
 
@@ -29,6 +37,10 @@ Automatically captures UTM parameters from URLs and populates hidden form fields
 ✅ **Error Handling** - Robust with debug logging
 ✅ **SPA Support** - Detects dynamically loaded forms
 ✅ **Zero Dependencies** - Pure vanilla JavaScript
+✅ **Click ID Capture** - fbclid (Facebook) + gclid (Google) for conversion tracking
+✅ **Iframe URL Passthrough (v1.2+)** - GHL forms embedded as an iframe on a client's own site still receive attribution (multi-host GHL detection + `data-iframe-host` for whitelabel domains)
+✅ **UID Cookie + Behavioral Beacons (v1.3+)** - `jps_uid` (UUID v4, 30d) + pageview/form_view/form_start beacons via `sendBeacon`, feeding JPS_produit touch tracking
+✅ **`data-account` Attribute (v1.3+)** - identifies the client account in beacon payloads
 
 ---
 
@@ -106,7 +118,7 @@ https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js
 
 ### Step 3: Deploy to Clients
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full client setup guide.
+See [docs/INSTALLATION.md](docs/INSTALLATION.md) for full client setup guide.
 
 ---
 
@@ -117,12 +129,14 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full client setup guide.
 **Settings → Tracking Code (or Custom Code section):**
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jamespicard-del/utm-tracker@v1/v1/tracker.js" data-account="<slug-client>"></script>
 ```
+
+**Form embedded as an iframe on the client's own site (WordPress, Webflow, custom HTML)?** Still works — install this same script tag on the host page. See [CHANGELOG.md §1.2.0](CHANGELOG.md) (iframe URL passthrough).
 
 ### 2. Create Hidden Fields in Forms
 
-**Forms → Custom Fields → Add 5 Hidden Fields:**
+**Forms → Custom Fields → Add 7 Hidden Fields:**
 
 | Field Name | Type | Field Key |
 |------------|------|-----------|
@@ -131,6 +145,8 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full client setup guide.
 | UTM Campaign | Hidden | `utm_campaign` |
 | UTM Term | Hidden | `utm_term` |
 | UTM Content | Hidden | `utm_content` |
+| Facebook Click ID | Hidden | `fbclid` |
+| Google Click ID | Hidden | `gclid` |
 
 **IMPORTANT:** Field Key (name attribute) MUST match exactly: `utm_source`, `utm_medium`, etc.
 
@@ -246,7 +262,7 @@ Add this after the script tag to see console logs:
 
 ### Custom Cookie Consent Integration
 
-Edit `tracker.js` line 47 to integrate with your consent platform:
+Edit the `cookiesAccepted()` function in `tracker.js` to integrate with your consent platform:
 
 ```javascript
 function cookiesAccepted() {
@@ -285,7 +301,7 @@ function cookiesAccepted() {
 2. Cookies not blocked by browser
 3. Domain/subdomain consistent (cookies are domain-specific)
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full troubleshooting guide.
+See [docs/INSTALLATION.md](docs/INSTALLATION.md) for full troubleshooting guide.
 
 ---
 
@@ -296,12 +312,17 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full troubleshooting guide.
 ```
 utm-tracker/
 ├── v1/
-│   └── tracker.js          # Production script (v1.x.x)
+│   └── tracker.js          # Production script (v1.x.x — currently 1.3.0)
 ├── v2/                     # Future major version (breaking changes)
 ├── docs/
-│   ├── DEPLOYMENT.md       # Client setup guide
+│   ├── QUICKREF.md         # Client-ready cheatsheet
+│   ├── INSTALLATION.md     # Client setup guide (GHL step-by-step)
+│   ├── FACEBOOK-SETUP.md   # Facebook Ads UTM template
+│   ├── GOOGLE-ADS-SETUP.md # Google Ads UTM template
 │   └── TESTING.md          # Testing checklist
 ├── README.md               # This file
+├── CLAUDE.md                # Durable index (mission, architecture, rules)
+├── CONTEXT.md                # Living state (goulot, next actions)
 └── CHANGELOG.md            # Version history
 ```
 
@@ -350,7 +371,7 @@ utm-tracker/
 ## Support
 
 - **Issues:** Open GitHub issue in utm-tracker repo
-- **Questions:** See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- **Questions:** See [docs/INSTALLATION.md](docs/INSTALLATION.md)
 - **Updates:** Watch CHANGELOG.md for new releases
 
 ---
